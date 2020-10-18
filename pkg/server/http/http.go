@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"github.com/gzlj/http-demo/pkg/prober"
@@ -29,6 +30,7 @@ func New(logger log.Logger, name string, prober *prober.HTTPProbe, opts ...Optio
 	}
 	mux := http.NewServeMux()
 	registerProbes(mux, prober, logger)
+	registerGetClient(mux)
 
 	return &Server{
 		logger: log.With(logger, "service", "http/server", "component", name),
@@ -44,6 +46,13 @@ func registerProbes(mux *http.ServeMux, p *prober.HTTPProbe, logger log.Logger) 
 		mux.Handle("/-/healthy", p.HealthyHandler(logger))
 		mux.Handle("/-/ready", p.ReadyHandler(logger))
 	}
+}
+
+func registerGetClient(mux *http.ServeMux) {
+	mux.Handle("/ip", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		str := fmt.Sprintf("Recieve from server: client is: %s", r.RemoteAddr)
+		w.Write([]byte(str))
+	}))
 }
 
 

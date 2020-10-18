@@ -6,12 +6,12 @@ import (
 	"github.com/go-kit/kit/log/level"
 	"github.com/gzlj/http-demo/pkg/prober"
 	httpserver "github.com/gzlj/http-demo/pkg/server/http"
+	"github.com/oklog/run"
+	"github.com/pkg/errors"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-	"github.com/oklog/run"
-	"github.com/pkg/errors"
 )
 
 
@@ -30,9 +30,11 @@ func main() {
 	logger = log.With(logger, "caller", log.DefaultCaller)
 
 	httpProbe := prober.NewHTTP()
-	statusProber := prober.Combine(
+	probers := prober.Combine(
 		httpProbe,
 	)
+
+	//返回http服务结构体实例，它封装了原生http服务
 	srv := httpserver.New(
 		logger,
 		"test-http",
@@ -46,13 +48,13 @@ func main() {
 	g.Add(
 	//此方法是actor的execute()方法
 	func() error {
-		statusProber.Healthy()
+		probers.Healthy()
 		return srv.ListenAndServe()
 	},
 	//此方法是actor的interrupt()方法
 	func(err error) {
-		statusProber.NotReady(err)
-		defer statusProber.NotHealthy(err)
+		probers.NotReady(err)
+		defer probers.NotHealthy(err)
 		//平滑关闭http服务
 		srv.Shutdown(err)
 	})
@@ -81,6 +83,7 @@ func main() {
 func interrupt(logger log.Logger, cancel <-chan struct{}) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	//接收到杀死信号或结束信号时，进行方法返回
 	select {
 	case s := <-c:
 		level.Info(logger).Log("msg", "caught signal. Beginng to exit.", "signal", s)
